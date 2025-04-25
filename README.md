@@ -79,7 +79,7 @@
 | MPI_Status                        | Структура статуса сообщения                                  |
 | MPI_ANY_SOURCE                    | Константа "Любому процессу"                                  |
 | MPI_ANY_TAG                       | Константа "Любой тег сообщения"                              |
-| MPI_*Get_*count                   | Получить количество данных по статусу                        |
+| MPI_Get_count                     | Получить количество данных по статусу                        |
 | MPI_Get_elements                  | Получить количество базовых элементов по статусу             |
 | MPI_Probe                         | Получить данные о сообщении без его приема                   |
 | MPI_PROC_NULL                     | Константа-идентификатор не существующего процесса            |
@@ -121,3 +121,5 @@ https://habr.com/ru/articles/121235/
 https://habr.com/ru/articles/548266/
 
 https://github.com/open-mpi/ompi
+
+http://www.ccas.ru/mmes/educat/lab04/02/p2pCommI.html#Sec3.3
