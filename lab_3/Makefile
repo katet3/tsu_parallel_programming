@@ -20,11 +20,11 @@ help:
 
 # Сборка программы
 build:
-	$(MPICC) $(TARGET).c -o $(TARGET).out
+	$(MPICC) $(TARGET).c -o $(TARGET).out -lm
 
 # Запуск программы
 run:
-	mpirun --mca btl_vader_single_copy_mechanism none -np $(NP) --oversubscribe ./$(TARGET).out
+	mpirun --mca btl_vader_single_copy_mechanism none -np $(NP) --oversubscribe ./$(TARGET).out $(N)
 
 # Очистка
 clean:
