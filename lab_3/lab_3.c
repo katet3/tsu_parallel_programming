@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    // Распределение данных (без дополнения нулями)
+    // Распределение данных
     int elements_per_proc = log2n;
     if (current_rank == num_groups - 1) {
         elements_per_proc = n - (num_groups - 1) * log2n;
