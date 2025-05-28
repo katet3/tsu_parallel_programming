@@ -1,64 +1,88 @@
+/*
+    https://www.mkurnosov.net/teaching/docs/pct-lecture4.pdf
+*/
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <mpi.h>
-#include <time.h>
 #include <math.h>
+#include <time.h>
+#include <stdbool.h>
 
-#define NUM_SAMPLES 1000000  // Общее количество случайных точек
-
-// Функция f(x, y)
-double f(double x, double y) {
+/** 
+ * Вычисляет значение функции в точке (x, y)
+ */
+double CalculateFunctionValue(double x, double y) {
     return (x * y) * (x * y);
 }
 
-// Проверка, принадлежит ли точка области D
-int is_in_region(double x, double y) {
-    return (x * y > 1 && x * y < 2 && fabs(x - y) < 1);
+/** 
+ * Проверяет принадлежность точки (x, y) области интегрирования
+ */
+bool IsPointInIntegrationDomain(double x, double y) {
+    return (x * y > 1 && x * y < 2) && (fabs(x - y) < 1);
 }
 
-int main(int argc, char **argv) {
-    int rank, size;
-    double total_integral = 0.0;
-    int count_in_region = 0;
-    double start_time, end_time;
+int main(int argc, char* argv[]) {
+    int process_rank;
+    int process_count;
+    long long total_point_count = 10000000;
+    long long local_point_count;
+    long long points_in_domain = 0;
+    double x_coordinate;
+    double y_coordinate;
+    double local_integral_sum = 0.0;
+    double global_integral_sum = 0.0;
+    double computation_start_time;
+    double computation_end_time;
 
     MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &process_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &process_count);
+    
+    local_point_count = total_point_count / process_count;
+    srand(time(NULL) + process_rank);
 
-    // Инициализация генератора случайных чисел
-    srand(time(NULL) + rank);
+    const double x_min_bound = 0.5;
+    const double x_max_bound = 2.0;
+    const double y_min_bound = 0.5;
+    const double y_max_bound = 2.0;
+    const double generation_area = (x_max_bound - x_min_bound) * (y_max_bound - y_min_bound);
 
-    int samples_per_process = NUM_SAMPLES / size;
-    double local_integral = 0.0;
-
-    start_time = MPI_Wtime();
-
-    // Генерация случайных точек и вычисление интеграла
-    for (int i = 0; i < samples_per_process; i++) {
-        double x = ((double)rand() / RAND_MAX) * 2; // Генерация x в [0, 2]
-        double y = ((double)rand() / RAND_MAX) * 2; // Генерация y в [0, 2]
-
-        if (is_in_region(x, y)) {
-            local_integral += f(x, y);
-            count_in_region++;
+    computation_start_time = MPI_Wtime();
+    
+    for (long long iteration = 0; iteration < local_point_count; iteration++) {
+        x_coordinate = x_min_bound + (x_max_bound - x_min_bound) * rand() / RAND_MAX;
+        y_coordinate = y_min_bound + (y_max_bound - y_min_bound) * rand() / RAND_MAX;
+        
+        if (IsPointInIntegrationDomain(x_coordinate, y_coordinate)) {
+            local_integral_sum += CalculateFunctionValue(x_coordinate, y_coordinate);
+            points_in_domain++;
         }
     }
 
-    // Сбор результатов от всех процессов
-    int total_count_in_region;
-    MPI_Reduce(&count_in_region, &total_count_in_region, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(&local_integral, &total_integral, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    long long total_points_in_domain;
+    MPI_Reduce(&points_in_domain, &total_points_in_domain, 1, MPI_LONG_LONG_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_integral_sum, &global_integral_sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    
+    computation_end_time = MPI_Wtime();
 
-    end_time = MPI_Wtime();
-
-    // Вычисление окончательного значения интеграла на корневом процессе
-    if (rank == 0) {
-        double estimated_integral = (total_integral / total_count_in_region) * (4.0 * total_count_in_region / NUM_SAMPLES);
-        double elapsed_time = end_time - start_time;
-
-        printf("Приближенное значение двойного интеграла: %f\n", estimated_integral);
-        printf("Время выполнения: %f секунд\n", elapsed_time);
+    if (process_rank == 0) {
+        double integral_approximation = generation_area * global_integral_sum / total_point_count;
+        
+        printf("Approximate integral value = %.10f\n", integral_approximation);
+        printf("Points inside domain = %lld / %lld (%.2f%%)\n", 
+               total_points_in_domain, total_point_count, 
+               100.0 * total_points_in_domain / total_point_count);
+        printf("Computation time = %.4f seconds\n", computation_end_time - computation_start_time);
+        
+        if (total_points_in_domain > 0) {
+            double standard_error = generation_area * 
+                                  sqrt(global_integral_sum / total_point_count - 
+                                  (integral_approximation / generation_area) * 
+                                  (integral_approximation / generation_area)) / 
+                                  sqrt(total_point_count);
+            printf("Estimated standard error = %.2e\n", standard_error);
+        }
     }
 
     MPI_Finalize();
